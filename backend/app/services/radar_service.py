@@ -5,10 +5,13 @@ from backend.app.db.database import get_connection
 def get_radar_data(player_name: str):
     conn = get_connection()
 
-    # 🔥 STEP 1: Smart base player selection
+    # 🔥 BASE PLAYER
     base_player_query = f"""
-    SELECT player_name, role,
-           goals_pct, xg_pct, assists_pct, xa_pct
+    SELECT 
+        player_name, role,
+        goals_pct, xg_pct, assists_pct, xa_pct,
+        shots_pct, passes_pct,
+        interceptions_pct, duels_pct, clearances_pct, carries_pct
     FROM player_percentiles
     WHERE player_name ILIKE '%{player_name}%'
     ORDER BY 
@@ -23,7 +26,6 @@ def get_radar_data(player_name: str):
 
     base_df = pd.read_sql(base_player_query, conn)
 
-    # ❌ No player found
     if base_df.empty:
         conn.close()
         return []
@@ -31,12 +33,10 @@ def get_radar_data(player_name: str):
     base_player = base_df.iloc[0]['player_name']
     role = base_df.iloc[0]['role']
 
-    goals = base_df.iloc[0]['goals_pct']
-    xg = base_df.iloc[0]['xg_pct']
-    assists = base_df.iloc[0]['assists_pct']
-    xa = base_df.iloc[0]['xa_pct']
+    # 🔥 EXTRACT VALUES FOR SIMILARITY
+    vals = base_df.iloc[0]
 
-    # 🔥 STEP 2: Find similar players
+    # 🔥 SIMILAR PLAYERS (UPDATED WITH NEW METRICS)
     similar_query = f"""
     SELECT 
         player_name,
@@ -45,12 +45,24 @@ def get_radar_data(player_name: str):
         xg_pct,
         assists_pct,
         xa_pct,
+        shots_pct,
+        passes_pct,
+        interceptions_pct,
+        duels_pct,
+        clearances_pct,
+        carries_pct,
 
         SQRT(
-            2 * POWER(goals_pct - {goals}, 2) +
-            2 * POWER(xg_pct - {xg}, 2) +
-            POWER(assists_pct - {assists}, 2) +
-            POWER(xa_pct - {xa}, 2)
+            POWER(goals_pct - {vals['goals_pct']}, 2) +
+            POWER(xg_pct - {vals['xg_pct']}, 2) +
+            POWER(assists_pct - {vals['assists_pct']}, 2) +
+            POWER(xa_pct - {vals['xa_pct']}, 2) +
+            POWER(shots_pct - {vals['shots_pct']}, 2) +
+            POWER(passes_pct - {vals['passes_pct']}, 2) +
+            POWER(interceptions_pct - {vals['interceptions_pct']}, 2) +
+            POWER(duels_pct - {vals['duels_pct']}, 2) +
+            POWER(clearances_pct - {vals['clearances_pct']}, 2) +
+            POWER(carries_pct - {vals['carries_pct']}, 2)
         ) AS similarity_score
 
     FROM player_percentiles
@@ -65,13 +77,9 @@ def get_radar_data(player_name: str):
 
     conn.close()
 
-    # 🔥 Combine base + similar
     final_df = pd.concat([
         base_df,
         similar_df.drop(columns=["similarity_score"])
     ])
 
-    # 🔥 FIX NaN issue (IMPORTANT)
-    final_df = final_df.fillna(0)
-
-    return final_df
+    return final_df.fillna(0)

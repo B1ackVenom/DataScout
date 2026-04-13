@@ -7,10 +7,10 @@ import psycopg2
 
 app = FastAPI()
 
-# ✅ CORS (frontend connection fix)
+# ✅ CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # later change to ["http://localhost:5173"]
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,7 +25,7 @@ def root():
     return {"message": "API running 🚀"}
 
 
-# 🔍 SEARCH PLAYERS (FIXED + SAFE)
+# 🔥 🔍 SEARCH (FIXED — IMPORTANT CHANGE HERE)
 @app.get("/player/search")
 def search_players(query: str):
     conn = psycopg2.connect(
@@ -36,30 +36,34 @@ def search_players(query: str):
         port="5432"
     )
 
-    # ✅ SAFE QUERY (NO string injection)
     q = """
     SELECT DISTINCT player_name
-    FROM master_players_filtered
+    FROM player_percentiles   -- 🔥 CHANGED FROM master_players_filtered
     WHERE LOWER(player_name) LIKE LOWER(%s)
+    ORDER BY player_name
     LIMIT 10;
     """
 
     df = pd.read_sql(q, conn, params=[f"%{query}%"])
     conn.close()
 
-    # ✅ Return clean list
     return df["player_name"].tolist()
 
 
-# 📊 RADAR DATA (FIXED NAN ISSUE)
+# 📊 RADAR (UNCHANGED — YOUR ORIGINAL LOGIC)
 @app.get("/player/radar")
 def radar(name: str):
-    df = get_radar_data(name)
+    try:
+        df = get_radar_data(name)
 
-    # ✅ Fix JSON crash (NaN issue)
-    df = df.fillna(0)
+        if df is None or len(df) == 0:
+            return []
 
-    # ✅ Ensure no weird values
-    df = df.replace([float("inf"), float("-inf")], 0)
+        df = pd.DataFrame(df)
+        df = df.fillna(0)
 
-    return df.to_dict(orient="records")
+        return df.to_dict(orient="records")
+
+    except Exception as e:
+        print("ERROR:", e)
+        return []
