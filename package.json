@@ -1,0 +1,12 @@
+{
+  "name": "football-analytics-app",
+  "version": "1.0.0",
+  "scripts": {
+    "frontend": "npm --prefix frontend run dev",
+    "backend": "python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir backend",
+    "dev": "concurrently -n BACKEND,FRONTEND -c green,blue \"npm run backend\" \"npm run frontend\""
+  },
+  "dependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
