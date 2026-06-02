@@ -11,16 +11,15 @@ import {
 
 import { METRICS, PLAYER_COLORS } from "@/types/player";
 import type { PlayerRadarData } from "@/types/player";
+import { motion } from "framer-motion";
 
 interface Props {
   players: PlayerRadarData[];
 }
 
 const RadarChartView = ({ players }: Props) => {
-  // 🔥 Detect role
   const role = players[0]?.role || "";
 
-  // 🔥 Filter metrics based on role
   const filteredMetrics = METRICS.filter((m) => {
     if (role === "Forward" || role === "Finisher") {
       return !["interceptions_pct", "duels_pct"].includes(m.key);
@@ -28,7 +27,6 @@ const RadarChartView = ({ players }: Props) => {
     return true;
   });
 
-  // 🔥 Build chart data (with % scaling)
   const data = filteredMetrics.map((m) => {
     const entry: Record<string, string | number> = { metric: m.label };
 
@@ -41,31 +39,50 @@ const RadarChartView = ({ players }: Props) => {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={420}>
-      <RadarChart data={data}>
-        <PolarGrid />
-        <PolarAngleAxis dataKey="metric" />
+    <motion.div
+      initial={{ opacity: 0, y: 25 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="bg-card border border-border rounded-xl p-4 shadow-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.01]"
+    >
+      <ResponsiveContainer width="100%" height={420}>
+        <RadarChart data={data}>
+          <PolarGrid />
+          <PolarAngleAxis dataKey="metric" />
+          <PolarRadiusAxis domain={[0, 100]} />
 
-        {/* 🔥 FIX SCALE */}
-        <PolarRadiusAxis domain={[0, 100]} />
-
-        {/* 🔥 FIX TOOLTIP */}
-        <Tooltip formatter={(v: number) => `${Number(v ?? 0).toFixed(0)}%`} />
-
-        {players.map((p, i) => (
-          <Radar
-            key={p.player_name}
-            name={p.player_name}
-            dataKey={p.player_name}
-            stroke={PLAYER_COLORS[i % PLAYER_COLORS.length]}
-            fill={PLAYER_COLORS[i % PLAYER_COLORS.length]}
-            fillOpacity={0.2}
+          <Tooltip
+            formatter={(v: number) => {
+              const val = Number(v);
+              const label =
+                val > 85
+                  ? "Elite"
+                  : val > 70
+                  ? "Good"
+                  : val > 50
+                  ? "Average"
+                  : "Low";
+              return [`${val.toFixed(0)}% (${label})`];
+            }}
           />
-        ))}
 
-        <Legend />
-      </RadarChart>
-    </ResponsiveContainer>
+          {players.map((p, i) => (
+            <Radar
+              key={p.player_name}
+              name={p.player_name}
+              dataKey={p.player_name}
+              stroke={PLAYER_COLORS[i % PLAYER_COLORS.length]}
+              fill={PLAYER_COLORS[i % PLAYER_COLORS.length]}
+              fillOpacity={0.25}
+              isAnimationActive
+              animationDuration={800}
+            />
+          ))}
+
+          <Legend />
+        </RadarChart>
+      </ResponsiveContainer>
+    </motion.div>
   );
 };
 
